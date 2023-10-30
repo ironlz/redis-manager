@@ -1,5 +1,7 @@
 package com.github.ironlz.redismanager.common;
 
+import redis.clients.jedis.Jedis;
+
 public interface RedisNode {
 
     /**
@@ -13,5 +15,7 @@ public interface RedisNode {
     RedisNode[] getFriends();
 
     void refreshNodeInfo();
+
+    Jedis getJedis();
 
 }
