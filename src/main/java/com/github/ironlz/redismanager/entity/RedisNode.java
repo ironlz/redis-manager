@@ -59,10 +59,54 @@ public class RedisNode extends Jedis {
         Scanner lines = new Scanner(nodes);
         while (lines.hasNextLine()) {
             String line = lines.nextLine();
+            String[] nodeInfoParts = line.split("\\s+");
+            if (nodeInfoParts.length < 8) {
+                LOGGER.error("{}:{} unknown node rsp: {}", this.ip, this.port, line);
+                throw new IllegalStateException("unknown myself rsp: " + line);
+            }
+            // https://redis.io/commands/cluster-nodes/
+            this.nodeId = nodeInfoParts[0];
+            this.addressInfo = nodeInfoParts[1];
+            this.roles = nodeInfoParts[2].split(",");
+            this.masterId = nodeInfoParts[3];
+            this.pingSent = Long.parseLong(nodeInfoParts[4]);
+            this.pongRecv = Long.parseLong(nodeInfoParts[5]);
+            this.configEpoch = Long.parseLong(nodeInfoParts[6]);
+            this.linkState = nodeInfoParts[7];
+            if (nodeInfoParts.length > 8) {
+                this.exportingSlots.clear();
+                this.importingSlots.clear();
+                for (int i = 8; i < nodeInfoParts.length; i++) {
+                    String slotInfo = nodeInfoParts[i];
+                    if (slotInfo.startsWith("[") && slotInfo.endsWith("]")) {
+                        slotInfo = slotInfo.substring(1, slotInfo.length() - 1);
+                    }
+                    String[] slotIndexRange = slotInfo.split("-");
+                    if (slotIndexRange.length == 3) {
+                        if (slotIndexRange[1].equals(">")) {
+                            this.exportingSlots.put(Integer.parseInt(slotIndexRange[0]), slotIndexRange[2]);
+                        } else if (slotIndexRange[1].equals("<")) {
+                            this.importingSlots.put(Integer.parseInt(slotIndexRange[0]), slotIndexRange[2]);
+                        } else {
+                            LOGGER.error("{}:{} unknown node format cause slot rsp: {}", this.ip, this.port, line);
+                            throw new IllegalStateException("unknown slotInfo format: " + slotInfo);
+                        }
+                    } else if (slotIndexRange.length == 2) {
+                        int startIndex = Integer.parseInt(slotIndexRange[0]);
+                        int endIndex = Integer.parseInt(slotIndexRange[1]);
+                        this.slots.set(startIndex, endIndex);
+                    } else if (slotIndexRange.length == 1) {
+                        this.slots.set(Integer.parseInt(slotIndexRange[0]));
+                    } else {
+                        LOGGER.error("{}:{} unknown node format cause slot size rsp: {}", this.ip, this.port, line);
+                        throw new IllegalStateException("unknown slotInfo format cause size: " + slotInfo);
+                    }
+                }
+            }
             if (line.contains("myself")) {
-                // todo 解析自身，解析完成后将自身放到cluster中
+
             } else {
-                // todo 解析其它节点，并放到cluster中
+
             }
         }
 
